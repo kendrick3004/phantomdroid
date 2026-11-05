@@ -1,0 +1,811 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>PhantomDroid</title>
+<style>
+  :root {
+    --bg: #0a0a0f;
+    --bg2: #111118;
+    --bg3: #1a1a24;
+    --border: #2a2a3a;
+    --accent: #00ff88;
+    --accent2: #00aaff;
+    --accent3: #ff4466;
+    --text: #e0e0e0;
+    --muted: #666680;
+    --success: #00ff88;
+    --error: #ff4466;
+    --warning: #ffaa00;
+  }
+
+  * { box-sizing: border-box; margin: 0; padding: 0; }
+
+  body {
+    background: var(--bg);
+    color: var(--text);
+    font-family: 'Courier New', monospace;
+    min-height: 100vh;
+  }
+
+  /* ── HEADER ── */
+  header {
+    background: var(--bg2);
+    border-bottom: 1px solid var(--border);
+    padding: 14px 20px;
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    position: sticky;
+    top: 0;
+    z-index: 100;
+  }
+
+  .logo {
+    font-size: 1.3rem;
+    font-weight: bold;
+    color: var(--accent);
+    letter-spacing: 2px;
+    text-shadow: 0 0 12px var(--accent);
+  }
+
+  .logo span { color: var(--text); }
+
+  .ip-badge {
+    font-size: 0.75rem;
+    color: var(--muted);
+    background: var(--bg3);
+    border: 1px solid var(--border);
+    padding: 4px 10px;
+    border-radius: 20px;
+  }
+
+  .status-dot {
+    display: inline-block;
+    width: 8px; height: 8px;
+    border-radius: 50%;
+    background: var(--accent);
+    margin-right: 6px;
+    animation: pulse 2s infinite;
+  }
+
+  @keyframes pulse {
+    0%, 100% { opacity: 1; }
+    50% { opacity: 0.3; }
+  }
+
+  /* ── TABS ── */
+  .tabs {
+    display: flex;
+    background: var(--bg2);
+    border-bottom: 1px solid var(--border);
+  }
+
+  .tab {
+    flex: 1;
+    padding: 14px 10px;
+    text-align: center;
+    cursor: pointer;
+    font-size: 0.8rem;
+    letter-spacing: 1px;
+    color: var(--muted);
+    border-bottom: 2px solid transparent;
+    transition: all 0.2s;
+    user-select: none;
+  }
+
+  .tab:hover { color: var(--text); background: var(--bg3); }
+
+  .tab.active {
+    color: var(--accent);
+    border-bottom-color: var(--accent);
+    text-shadow: 0 0 8px var(--accent);
+  }
+
+  .tab .icon { font-size: 1.1rem; display: block; margin-bottom: 2px; }
+
+  /* ── PANELS ── */
+  .panel { display: none; padding: 20px; max-width: 700px; margin: 0 auto; }
+  .panel.active { display: block; }
+
+  /* ── CARDS ── */
+  .card {
+    background: var(--bg2);
+    border: 1px solid var(--border);
+    border-radius: 10px;
+    padding: 18px;
+    margin-bottom: 16px;
+  }
+
+  .card-title {
+    font-size: 0.75rem;
+    letter-spacing: 2px;
+    color: var(--accent);
+    text-transform: uppercase;
+    margin-bottom: 14px;
+    display: flex;
+    align-items: center;
+    gap: 8px;
+  }
+
+  /* ── INPUTS ── */
+  input[type=text], input[type=number], select, textarea {
+    width: 100%;
+    background: var(--bg3);
+    border: 1px solid var(--border);
+    border-radius: 6px;
+    color: var(--text);
+    padding: 10px 12px;
+    font-family: 'Courier New', monospace;
+    font-size: 0.9rem;
+    outline: none;
+    transition: border-color 0.2s;
+  }
+
+  input:focus, select:focus, textarea:focus {
+    border-color: var(--accent2);
+  }
+
+  textarea { resize: vertical; min-height: 80px; }
+
+  label {
+    font-size: 0.75rem;
+    color: var(--muted);
+    display: block;
+    margin-bottom: 5px;
+    margin-top: 12px;
+  }
+
+  /* ── BUTTONS ── */
+  .btn {
+    display: inline-flex;
+    align-items: center;
+    gap: 6px;
+    padding: 10px 20px;
+    border: none;
+    border-radius: 6px;
+    cursor: pointer;
+    font-family: 'Courier New', monospace;
+    font-size: 0.85rem;
+    font-weight: bold;
+    letter-spacing: 1px;
+    transition: all 0.2s;
+    text-transform: uppercase;
+  }
+
+  .btn-green {
+    background: transparent;
+    border: 1px solid var(--accent);
+    color: var(--accent);
+  }
+  .btn-green:hover {
+    background: var(--accent);
+    color: var(--bg);
+    box-shadow: 0 0 15px var(--accent);
+  }
+
+  .btn-blue {
+    background: transparent;
+    border: 1px solid var(--accent2);
+    color: var(--accent2);
+  }
+  .btn-blue:hover {
+    background: var(--accent2);
+    color: var(--bg);
+    box-shadow: 0 0 15px var(--accent2);
+  }
+
+  .btn-red {
+    background: transparent;
+    border: 1px solid var(--accent3);
+    color: var(--accent3);
+  }
+  .btn-red:hover {
+    background: var(--accent3);
+    color: var(--bg);
+    box-shadow: 0 0 15px var(--accent3);
+  }
+
+  .btn-row {
+    display: flex;
+    gap: 10px;
+    flex-wrap: wrap;
+    margin-top: 14px;
+  }
+
+  /* ── PRESET GRID (IR) ── */
+  .preset-grid {
+    display: grid;
+    grid-template-columns: repeat(auto-fill, minmax(140px, 1fr));
+    gap: 8px;
+    margin-top: 10px;
+  }
+
+  .preset-btn {
+    padding: 10px 8px;
+    background: var(--bg3);
+    border: 1px solid var(--border);
+    border-radius: 6px;
+    color: var(--text);
+    font-family: 'Courier New', monospace;
+    font-size: 0.75rem;
+    cursor: pointer;
+    text-align: center;
+    transition: all 0.2s;
+  }
+
+  .preset-btn:hover {
+    border-color: var(--accent);
+    color: var(--accent);
+    background: rgba(0,255,136,0.05);
+  }
+
+  .preset-btn:active {
+    transform: scale(0.96);
+    box-shadow: 0 0 10px var(--accent);
+  }
+
+  /* ── NETWORK LIST ── */
+  .net-list { margin-top: 10px; }
+
+  .net-item {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    padding: 10px 12px;
+    background: var(--bg3);
+    border: 1px solid var(--border);
+    border-radius: 6px;
+    margin-bottom: 8px;
+    cursor: pointer;
+    transition: border-color 0.2s;
+  }
+
+  .net-item:hover { border-color: var(--accent2); }
+  .net-item.selected { border-color: var(--accent); background: rgba(0,255,136,0.05); }
+
+  .net-ssid { font-weight: bold; font-size: 0.9rem; }
+  .net-meta { font-size: 0.72rem; color: var(--muted); margin-top: 2px; }
+
+  .signal-bar {
+    display: flex;
+    align-items: flex-end;
+    gap: 2px;
+    height: 20px;
+  }
+
+  .signal-bar span {
+    width: 4px;
+    background: var(--border);
+    border-radius: 1px;
+    display: block;
+  }
+
+  .signal-bar span.on { background: var(--accent); }
+
+  /* ── LOG / OUTPUT ── */
+  .log-box {
+    background: var(--bg);
+    border: 1px solid var(--border);
+    border-radius: 6px;
+    padding: 12px;
+    font-size: 0.8rem;
+    color: var(--accent);
+    min-height: 80px;
+    max-height: 200px;
+    overflow-y: auto;
+    white-space: pre-wrap;
+    word-break: break-all;
+    margin-top: 14px;
+  }
+
+  .log-box .err { color: var(--error); }
+  .log-box .warn { color: var(--warning); }
+  .log-box .ok { color: var(--success); }
+  .log-box .info { color: var(--accent2); }
+
+  /* ── TOAST ── */
+  #toast {
+    position: fixed;
+    bottom: 24px;
+    left: 50%;
+    transform: translateX(-50%);
+    background: var(--bg3);
+    border: 1px solid var(--border);
+    border-radius: 20px;
+    padding: 10px 22px;
+    font-size: 0.85rem;
+    display: none;
+    z-index: 999;
+    max-width: 90vw;
+    text-align: center;
+  }
+
+  #toast.show { display: block; animation: fadeInOut 2.5s ease; }
+  #toast.success { border-color: var(--success); color: var(--success); }
+  #toast.error { border-color: var(--error); color: var(--error); }
+
+  @keyframes fadeInOut {
+    0% { opacity: 0; transform: translateX(-50%) translateY(10px); }
+    15%, 85% { opacity: 1; transform: translateX(-50%) translateY(0); }
+    100% { opacity: 0; transform: translateX(-50%) translateY(10px); }
+  }
+
+  /* ── BT FLOOD INDICATOR ── */
+  .flood-indicator {
+    display: flex;
+    align-items: center;
+    gap: 10px;
+    padding: 12px;
+    border-radius: 6px;
+    background: var(--bg3);
+    border: 1px solid var(--border);
+    margin-top: 14px;
+    font-size: 0.85rem;
+  }
+
+  .flood-indicator.active { border-color: var(--error); }
+
+  .flood-dot {
+    width: 10px; height: 10px;
+    border-radius: 50%;
+    background: var(--muted);
+  }
+
+  .flood-indicator.active .flood-dot {
+    background: var(--error);
+    animation: pulse 0.8s infinite;
+  }
+
+  /* ── PROGRESS BAR ── */
+  .progress {
+    height: 4px;
+    background: var(--border);
+    border-radius: 2px;
+    overflow: hidden;
+    margin-top: 10px;
+  }
+
+  .progress-bar {
+    height: 100%;
+    background: var(--accent);
+    width: 0%;
+    transition: width 0.5s;
+  }
+
+  /* ── INSTALL GUIDE ── */
+  .guide {
+    background: var(--bg3);
+    border: 1px solid var(--border);
+    border-radius: 8px;
+    padding: 14px;
+    margin-top: 14px;
+  }
+
+  .guide code {
+    display: block;
+    background: var(--bg);
+    border-left: 3px solid var(--accent);
+    padding: 8px 12px;
+    margin: 6px 0;
+    border-radius: 0 4px 4px 0;
+    font-size: 0.82rem;
+    color: var(--accent);
+    word-break: break-all;
+  }
+
+  .guide p { font-size: 0.8rem; color: var(--muted); margin: 8px 0 2px; }
+</style>
+</head>
+<body>
+
+<header>
+  <div class="logo">PHANTOM<span>DROID</span></div>
+  <div class="ip-badge"><span class="status-dot"></span>{{ local_ip }}:8080</div>
+</header>
+
+<div class="tabs">
+  <div class="tab active" onclick="switchTab('ir')">
+    <span class="icon">📡</span>IR REMOTE
+  </div>
+  <div class="tab" onclick="switchTab('wifi')">
+    <span class="icon">📶</span>WIFI
+  </div>
+  <div class="tab" onclick="switchTab('bt')">
+    <span class="icon">🦷</span>BLUETOOTH
+  </div>
+</div>
+
+<!-- ═══════════════════════════════════════
+     TAB IR REMOTE
+══════════════════════════════════════════ -->
+<div class="panel active" id="panel-ir">
+
+  <div class="card">
+    <div class="card-title">📡 Presets de TV</div>
+    <div id="ir-preset-grid" class="preset-grid">
+      <div style="color:var(--muted);font-size:0.8rem">Carregando presets...</div>
+    </div>
+  </div>
+
+  <div class="card">
+    <div class="card-title">⚙️ Código Manual</div>
+    <label>Frequência (Hz)</label>
+    <input type="number" id="ir-freq" value="38000" placeholder="38000">
+    <label>Padrão (pulsos separados por vírgula)</label>
+    <textarea id="ir-pattern" placeholder="4500,4500,560,1690,..."></textarea>
+    <div class="btn-row">
+      <button class="btn btn-green" onclick="irSend()">▶ ENVIAR</button>
+      <button class="btn btn-blue" onclick="irCheck()">🔍 TESTAR IR</button>
+    </div>
+  </div>
+
+  <div class="log-box" id="ir-log">» Aguardando comando...\n</div>
+
+</div>
+
+<!-- ═══════════════════════════════════════
+     TAB WIFI
+══════════════════════════════════════════ -->
+<div class="panel" id="panel-wifi">
+
+  <div class="card">
+    <div class="card-title">📶 Scanner de Redes</div>
+    <div class="btn-row">
+      <button class="btn btn-blue" onclick="wifiScan()">🔍 ESCANEAR</button>
+      <button class="btn btn-green" onclick="wifiInfo()">ℹ️ MINHA REDE</button>
+    </div>
+    <div id="net-list" class="net-list"></div>
+  </div>
+
+  <div class="card">
+    <div class="card-title">👿 Evil Twin AP</div>
+    <label>SSID do Alvo (clique na rede acima para auto-preencher)</label>
+    <input type="text" id="evil-ssid" placeholder="Nome da rede alvo">
+    <div class="btn-row">
+      <button class="btn btn-red" onclick="startEvilTwin()">⚡ CRIAR AP FALSO</button>
+    </div>
+    <div class="guide">
+      <p>⚠️ Requer root + hostapd instalado no Termux:</p>
+      <code>pkg install root-repo</code>
+      <code>pkg install hostapd dnsmasq</code>
+    </div>
+  </div>
+
+  <div class="log-box" id="wifi-log">» Aguardando comando...\n</div>
+
+</div>
+
+<!-- ═══════════════════════════════════════
+     TAB BLUETOOTH
+══════════════════════════════════════════ -->
+<div class="panel" id="panel-bt">
+
+  <div class="card">
+    <div class="card-title">🔍 Scanner Bluetooth</div>
+    <div class="btn-row">
+      <button class="btn btn-blue" onclick="btScan()">📡 ESCANEAR (8s)</button>
+    </div>
+    <div id="bt-list" class="net-list"></div>
+  </div>
+
+  <div class="card">
+    <div class="card-title">💀 L2CAP Deauth Flood</div>
+    <label>MAC do alvo (clique no dispositivo acima para auto-preencher)</label>
+    <input type="text" id="bt-mac" placeholder="AA:BB:CC:DD:EE:FF">
+    <label>Duração (segundos)</label>
+    <input type="number" id="bt-duration" value="30" min="5" max="120">
+
+    <div class="flood-indicator" id="flood-indicator">
+      <div class="flood-dot"></div>
+      <span id="flood-status">Inativo</span>
+    </div>
+
+    <div class="progress">
+      <div class="progress-bar" id="flood-progress"></div>
+    </div>
+
+    <div class="btn-row">
+      <button class="btn btn-red" onclick="btDeauth()">⚡ INICIAR FLOOD</button>
+      <button class="btn btn-green" onclick="btStop()">■ PARAR</button>
+    </div>
+  </div>
+
+  <div class="log-box" id="bt-log">» Aguardando comando...\n</div>
+
+</div>
+
+<!-- TOAST -->
+<div id="toast"></div>
+
+<script>
+// ─── UTILS ───────────────────────────────────
+
+function switchTab(name) {
+  document.querySelectorAll('.tab').forEach((t, i) => {
+    const names = ['ir','wifi','bt'];
+    t.classList.toggle('active', names[i] === name);
+  });
+  document.querySelectorAll('.panel').forEach(p => p.classList.remove('active'));
+  document.getElementById('panel-' + name).classList.add('active');
+}
+
+function log(boxId, msg, type='') {
+  const box = document.getElementById(boxId);
+  const line = document.createElement('span');
+  line.className = type;
+  line.textContent = '» ' + msg + '\n';
+  box.appendChild(line);
+  box.scrollTop = box.scrollHeight;
+}
+
+function toast(msg, type='success') {
+  const t = document.getElementById('toast');
+  t.textContent = msg;
+  t.className = 'show ' + type;
+  setTimeout(() => t.className = '', 2500);
+}
+
+async function api(path, method='GET', body=null) {
+  const opts = { method, headers: {'Content-Type':'application/json'} };
+  if (body) opts.body = JSON.stringify(body);
+  const res = await fetch('/api' + path, opts);
+  return res.json();
+}
+
+function signalBars(level) {
+  // level: -30 (excelente) a -100 (péssimo)
+  const pct = Math.max(0, Math.min(100, (level + 100) * 1.43));
+  const bars = Math.round(pct / 25);
+  let html = '<div class="signal-bar">';
+  for (let i = 1; i <= 4; i++) {
+    const h = i * 5;
+    html += `<span style="height:${h}px" class="${i <= bars ? 'on' : ''}"></span>`;
+  }
+  return html + '</div>';
+}
+
+// ─── IR ──────────────────────────────────────
+
+async function loadPresets() {
+  const data = await api('/ir/codes');
+  const grid = document.getElementById('ir-preset-grid');
+  grid.innerHTML = '';
+  data.forEach(key => {
+    const label = key.replace(/_/g, ' ').toUpperCase();
+    const btn = document.createElement('button');
+    btn.className = 'preset-btn';
+    btn.textContent = label;
+    btn.onclick = () => irSendPreset(key);
+    grid.appendChild(btn);
+  });
+}
+
+async function irSendPreset(preset) {
+  log('ir-log', `Enviando preset: ${preset}...`, 'info');
+  const data = await api('/ir/send', 'POST', { preset });
+  if (data.ok) {
+    log('ir-log', 'Sinal IR enviado!', 'ok');
+    toast('✅ Sinal enviado!');
+  } else {
+    log('ir-log', 'Erro: ' + (data.err || 'falha desconhecida'), 'err');
+    toast('❌ ' + (data.err || 'Falha'), 'error');
+  }
+}
+
+async function irSend() {
+  const freq = document.getElementById('ir-freq').value;
+  const pattern = document.getElementById('ir-pattern').value.trim();
+  if (!freq || !pattern) { toast('Preencha frequência e padrão', 'error'); return; }
+  log('ir-log', `Enviando: freq=${freq}...`, 'info');
+  const data = await api('/ir/send', 'POST', { freq, pattern });
+  if (data.ok) {
+    log('ir-log', 'Sinal enviado!', 'ok');
+    toast('✅ Sinal enviado!');
+  } else {
+    log('ir-log', 'Erro: ' + data.err, 'err');
+    toast('❌ ' + data.err, 'error');
+  }
+}
+
+async function irCheck() {
+  log('ir-log', 'Verificando suporte a IR...', 'info');
+  const data = await api('/ir/check');
+  if (data.ok) {
+    log('ir-log', 'IR suportado! Frequências: ' + data.frequencies, 'ok');
+    toast('✅ IR disponível!');
+  } else {
+    log('ir-log', data.err, 'err');
+    toast('❌ ' + data.err, 'error');
+  }
+}
+
+// ─── WIFI ─────────────────────────────────────
+
+let selectedSSID = '';
+
+async function wifiScan() {
+  log('wifi-log', 'Escaneando redes WiFi...', 'info');
+  document.getElementById('net-list').innerHTML =
+    '<div style="color:var(--muted);font-size:0.8rem;padding:10px">Escaneando...</div>';
+  const data = await api('/wifi/scan');
+  const list = document.getElementById('net-list');
+  list.innerHTML = '';
+  if (!data.ok) {
+    log('wifi-log', 'Erro: ' + data.err, 'err');
+    toast('❌ ' + data.err, 'error');
+    return;
+  }
+  const networks = data.networks;
+  log('wifi-log', `${networks.length} redes encontradas`, 'ok');
+  networks.sort((a, b) => (b.rssi || b.level || 0) - (a.rssi || a.level || 0));
+  networks.forEach(net => {
+    const ssid = net.ssid || net.SSID || '(oculta)';
+    const level = net.rssi || net.level || -80;
+    const bssid = net.bssid || net.BSSID || '';
+    const security = net.capabilities || net.security || '';
+    const div = document.createElement('div');
+    div.className = 'net-item';
+    div.innerHTML = `
+      <div>
+        <div class="net-ssid">${ssid}</div>
+        <div class="net-meta">${bssid} · ${level}dBm · ${security.includes('WPA') ? '🔒 WPA' : security.includes('WEP') ? '🔓 WEP' : '🔓 Aberta'}</div>
+      </div>
+      ${signalBars(level)}
+    `;
+    div.onclick = () => {
+      document.querySelectorAll('.net-item').forEach(n => n.classList.remove('selected'));
+      div.classList.add('selected');
+      selectedSSID = ssid;
+      document.getElementById('evil-ssid').value = ssid;
+      toast('📋 ' + ssid + ' selecionada');
+    };
+    list.appendChild(div);
+  });
+}
+
+async function wifiInfo() {
+  log('wifi-log', 'Obtendo info da conexão atual...', 'info');
+  const data = await api('/wifi/info');
+  if (data.ok) {
+    const info = data.info;
+    const ssid = info.ssid || info.SSID || '?';
+    const ip = info.ip || info.ipAddress || '?';
+    const mac = info.bssid || info.BSSID || '?';
+    log('wifi-log', `Conectado: ${ssid} | IP: ${ip} | AP: ${mac}`, 'ok');
+  } else {
+    log('wifi-log', 'Erro: ' + data.err, 'err');
+  }
+}
+
+async function startEvilTwin() {
+  const ssid = document.getElementById('evil-ssid').value.trim();
+  if (!ssid) { toast('Digite o SSID alvo', 'error'); return; }
+  log('wifi-log', `Iniciando Evil Twin: "${ssid}"...`, 'warn');
+  const data = await api('/wifi/evil_twin', 'POST', { ssid });
+  if (data.ok) {
+    log('wifi-log', data.msg, 'ok');
+    toast('⚡ ' + data.msg);
+  } else {
+    log('wifi-log', data.err, 'err');
+    if (data.tip) log('wifi-log', '💡 ' + data.tip, 'warn');
+    toast('❌ ' + data.err, 'error');
+  }
+}
+
+// ─── BLUETOOTH ───────────────────────────────
+
+let floodTimer = null;
+let floodEnd = 0;
+
+async function btScan() {
+  log('bt-log', 'Escaneando dispositivos BT (~8s)...', 'info');
+  document.getElementById('bt-list').innerHTML =
+    '<div style="color:var(--muted);font-size:0.8rem;padding:10px">Escaneando...</div>';
+  const data = await api('/bt/scan');
+  const list = document.getElementById('bt-list');
+  list.innerHTML = '';
+
+  if (data.scan) {
+    // Parseia saída do bluetoothctl "Device AA:BB:CC:DD:EE:FF Nome"
+    const lines = data.scan.split('\n').filter(l => l.includes('Device') || l.match(/([0-9A-Fa-f]{2}:){5}/));
+    const devices = [];
+    lines.forEach(line => {
+      const match = line.match(/([0-9A-Fa-f]{2}:){5}[0-9A-Fa-f]{2}/);
+      if (match) {
+        const mac = match[0];
+        const name = line.replace(/.*Device\s+[^\s]+\s*/, '').trim() || 'Desconhecido';
+        if (!devices.find(d => d.mac === mac)) devices.push({ mac, name });
+      }
+    });
+
+    if (devices.length === 0) {
+      list.innerHTML = '<div style="color:var(--muted);font-size:0.8rem;padding:10px">Nenhum dispositivo encontrado. Coloque o alvo em modo visível.</div>';
+      log('bt-log', 'Nenhum dispositivo encontrado', 'warn');
+      return;
+    }
+
+    devices.forEach(dev => {
+      const div = document.createElement('div');
+      div.className = 'net-item';
+      div.innerHTML = `
+        <div>
+          <div class="net-ssid">🦷 ${dev.name}</div>
+          <div class="net-meta">${dev.mac}</div>
+        </div>
+        <div style="font-size:0.75rem;color:var(--muted)">SELECIONAR</div>
+      `;
+      div.onclick = () => {
+        document.querySelectorAll('#bt-list .net-item').forEach(n => n.classList.remove('selected'));
+        div.classList.add('selected');
+        document.getElementById('bt-mac').value = dev.mac;
+        toast('📋 ' + dev.mac);
+      };
+      list.appendChild(div);
+    });
+
+    log('bt-log', `${devices.length} dispositivo(s) encontrado(s)`, 'ok');
+  } else {
+    log('bt-log', 'Erro no scan: ' + (data.err || 'sem resultado'), 'err');
+  }
+}
+
+async function btDeauth() {
+  const mac = document.getElementById('bt-mac').value.trim();
+  const duration = parseInt(document.getElementById('bt-duration').value) || 30;
+  if (!mac) { toast('Informe o MAC do alvo', 'error'); return; }
+
+  log('bt-log', `Iniciando L2CAP flood → ${mac} por ${duration}s`, 'warn');
+  const data = await api('/bt/deauth', 'POST', { mac, duration });
+
+  if (data.ok) {
+    log('bt-log', data.msg, 'ok');
+    if (data.tip) log('bt-log', '💡 ' + data.tip, 'info');
+    toast('⚡ Flood iniciado!');
+    startFloodUI(duration);
+  } else {
+    log('bt-log', 'Erro: ' + data.err, 'err');
+    toast('❌ ' + data.err, 'error');
+  }
+}
+
+function startFloodUI(duration) {
+  const indicator = document.getElementById('flood-indicator');
+  const statusEl = document.getElementById('flood-status');
+  const progressBar = document.getElementById('flood-progress');
+  indicator.classList.add('active');
+  floodEnd = Date.now() + duration * 1000;
+
+  if (floodTimer) clearInterval(floodTimer);
+  floodTimer = setInterval(() => {
+    const remaining = Math.max(0, Math.round((floodEnd - Date.now()) / 1000));
+    const pct = (1 - remaining / duration) * 100;
+    progressBar.style.width = pct + '%';
+    statusEl.textContent = remaining > 0 ? `Flood ativo — ${remaining}s restantes` : 'Concluído';
+    if (remaining === 0) {
+      clearInterval(floodTimer);
+      indicator.classList.remove('active');
+      progressBar.style.width = '100%';
+      log('bt-log', 'Flood finalizado', 'ok');
+    }
+  }, 500);
+}
+
+async function btStop() {
+  const data = await api('/bt/stop', 'POST');
+  if (data.ok) {
+    clearInterval(floodTimer);
+    document.getElementById('flood-indicator').classList.remove('active');
+    document.getElementById('flood-status').textContent = 'Parado';
+    document.getElementById('flood-progress').style.width = '0%';
+    log('bt-log', 'Flood parado pelo usuário', 'warn');
+    toast('■ Flood parado');
+  }
+}
+
+// ─── INIT ─────────────────────────────────────
+loadPresets();
+</script>
+</body>
+</html>
