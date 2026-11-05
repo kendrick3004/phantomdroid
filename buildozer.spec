@@ -32,11 +32,12 @@ android.permissions = \
     BLUETOOTH_CONNECT,\
     BLUETOOTH_ADVERTISE
 
-android.api         = 33
-android.minapi      = 24
-android.ndk         = 25b
-android.sdk         = 33
-android.archs       = arm64-v8a, armeabi-v7a
-android.allow_backup = True
+android.api              = 33
+android.minapi           = 24
+android.ndk              = 25b
+android.sdk              = 33
+android.build_tools_version = 33.0.2
+android.archs            = arm64-v8a, armeabi-v7a
+android.allow_backup     = True
 android.release_artifact = apk
-android.debug       = 0
+android.debug            = 0

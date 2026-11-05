@@ -8,7 +8,7 @@ on:
 jobs:
   build:
     runs-on: ubuntu-22.04
-    timeout-minutes: 60
+    timeout-minutes: 90
 
     steps:
       - name: Checkout
@@ -51,24 +51,52 @@ jobs:
 
       - name: Fake ANT dir so Buildozer nao baixe
         run: |
-          # Buildozer verifica se ~/.buildozer/android/platform/apache-ant-1.9.4/ existe.
-          # Se existir, pula o download. Criamos o diretório e apontamos o binário para o ant do apt.
           ANT_FAKE="$HOME/.buildozer/android/platform/apache-ant-1.9.4"
           mkdir -p "$ANT_FAKE/bin"
           ln -sf "$(which ant)" "$ANT_FAKE/bin/ant"
           echo "ANT fake criado em: $ANT_FAKE"
           ls -la "$ANT_FAKE/bin/"
 
-      - name: Install Buildozer + Cython
+      - name: Install Android SDK cmdline-tools
+        env:
+          JAVA_HOME: /usr/lib/jvm/java-17-openjdk-amd64
         run: |
-          pip install --upgrade pip
-          pip install buildozer cython
+          SDK_DIR="$HOME/.buildozer/android/platform/android-sdk"
+          mkdir -p "$SDK_DIR"
 
-      - name: Pre-accept Android SDK licenses
+          # Baixa cmdline-tools mais recente
+          wget -q -O /tmp/cmdline-tools.zip \
+            "https://dl.google.com/android/repository/commandlinetools-linux-11076708_latest.zip"
+
+          # Extrai para cmdline-tools/latest (dentro do zip vem pasta "cmdline-tools")
+          mkdir -p "$SDK_DIR/cmdline-tools"
+          unzip -q /tmp/cmdline-tools.zip -d "$SDK_DIR/cmdline-tools"
+          # Google empacota como cmdline-tools/cmdline-tools — renomeia para latest
+          if [ -d "$SDK_DIR/cmdline-tools/cmdline-tools" ]; then
+            mv "$SDK_DIR/cmdline-tools/cmdline-tools" "$SDK_DIR/cmdline-tools/latest"
+          fi
+
+          SDKMGR="$SDK_DIR/cmdline-tools/latest/bin/sdkmanager"
+          echo "sdkmanager version:"
+          "$SDKMGR" --version
+
+          # Cria symlink no caminho ANTIGO que o buildozer espera: tools/bin/sdkmanager
+          mkdir -p "$SDK_DIR/tools/bin"
+          ln -sf "$SDKMGR" "$SDK_DIR/tools/bin/sdkmanager"
+
+          # Aceita todas as licencas
+          yes | "$SDKMGR" --licenses || true
+
+          # Instala os pacotes necessarios para build-tools 33.0.2 + platform-tools + android-33
+          "$SDKMGR" "platform-tools" "platforms;android-33" "build-tools;33.0.2"
+
+          echo "SDK instalado com sucesso:"
+          ls "$SDK_DIR/"
+
+      - name: Pre-accept Android SDK licenses (arquivos)
         run: |
           SDK_LIC="$HOME/.buildozer/android/platform/android-sdk/licenses"
           mkdir -p "$SDK_LIC"
-          # Hashes oficiais do Google para aceitar licenças
           printf "24333f8a63b6825ea9c5514f83c2829b004d1fee\nd56f5187479451eabf01fb78af6dfcb131a6481e\n8933bad161af4178b1185d1a37fbf41ea5269c55\n" \
             > "$SDK_LIC/android-sdk-license"
           printf "84831b9409646a918e30573bab4c9c91346d8abd\n" \
@@ -78,21 +106,30 @@ jobs:
           echo "Licencas pre-aceitas:"
           ls -la "$SDK_LIC/"
 
+      - name: Install Buildozer + Cython
+        run: |
+          pip install --upgrade pip
+          pip install buildozer cython
+
       - name: Build APK
         env:
           JAVA_HOME: /usr/lib/jvm/java-17-openjdk-amd64
           ANDROID_SDK_ROOT: /home/runner/.buildozer/android/platform/android-sdk
-        run: |
-          # Se sdkmanager existir, aceita todas as licencas interativamente tambem
-          SDKMGR="$HOME/.buildozer/android/platform/android-sdk/cmdline-tools/latest/bin/sdkmanager"
-          if [ -f "$SDKMGR" ]; then
-            yes | "$SDKMGR" --licenses || true
-          fi
-          buildozer -v android debug
+          ANDROID_HOME: /home/runner/.buildozer/android/platform/android-sdk
+        run: buildozer -v android debug
 
       - name: Upload APK
         uses: actions/upload-artifact@v4
+        if: success()
         with:
           name: PhantomDroid-APK
           path: bin/*.apk
           retention-days: 30
+
+      - name: Upload logs on failure
+        uses: actions/upload-artifact@v4
+        if: failure()
+        with:
+          name: buildozer-logs
+          path: .buildozer/android/platform/build-*/logs/
+          retention-days: 7
