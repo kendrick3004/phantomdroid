@@ -634,6 +634,7 @@ async function wifiScan() {
   list.innerHTML = '';
   if (!data.ok) {
     log('wifi-log', 'Erro: ' + data.err, 'err');
+    if (data.tip) log('wifi-log', '💡 ' + data.tip, 'warn');
     toast('❌ ' + data.err, 'error');
     return;
   }
@@ -700,55 +701,59 @@ let floodTimer = null;
 let floodEnd = 0;
 
 async function btScan() {
-  log('bt-log', 'Escaneando dispositivos BT (~8s)...', 'info');
+  log('bt-log', 'Escaneando dispositivos BT (~8s, aguarde)...', 'info');
   document.getElementById('bt-list').innerHTML =
-    '<div style="color:var(--muted);font-size:0.8rem;padding:10px">Escaneando...</div>';
-  const data = await api('/bt/scan');
+    '<div style="color:var(--muted);font-size:0.8rem;padding:10px">⏳ Escaneando por 8 segundos...</div>';
+
+  let data;
+  try {
+    data = await api('/bt/scan');
+  } catch(e) {
+    log('bt-log', 'Erro de rede: ' + e, 'err');
+    return;
+  }
+
   const list = document.getElementById('bt-list');
   list.innerHTML = '';
 
-  if (data.scan) {
-    // Parseia saída do bluetoothctl "Device AA:BB:CC:DD:EE:FF Nome"
-    const lines = data.scan.split('\n').filter(l => l.includes('Device') || l.match(/([0-9A-Fa-f]{2}:){5}/));
-    const devices = [];
-    lines.forEach(line => {
-      const match = line.match(/([0-9A-Fa-f]{2}:){5}[0-9A-Fa-f]{2}/);
-      if (match) {
-        const mac = match[0];
-        const name = line.replace(/.*Device\s+[^\s]+\s*/, '').trim() || 'Desconhecido';
-        if (!devices.find(d => d.mac === mac)) devices.push({ mac, name });
-      }
-    });
-
-    if (devices.length === 0) {
-      list.innerHTML = '<div style="color:var(--muted);font-size:0.8rem;padding:10px">Nenhum dispositivo encontrado. Coloque o alvo em modo visível.</div>';
-      log('bt-log', 'Nenhum dispositivo encontrado', 'warn');
-      return;
-    }
-
-    devices.forEach(dev => {
-      const div = document.createElement('div');
-      div.className = 'net-item';
-      div.innerHTML = `
-        <div>
-          <div class="net-ssid">🦷 ${dev.name}</div>
-          <div class="net-meta">${dev.mac}</div>
-        </div>
-        <div style="font-size:0.75rem;color:var(--muted)">SELECIONAR</div>
-      `;
-      div.onclick = () => {
-        document.querySelectorAll('#bt-list .net-item').forEach(n => n.classList.remove('selected'));
-        div.classList.add('selected');
-        document.getElementById('bt-mac').value = dev.mac;
-        toast('📋 ' + dev.mac);
-      };
-      list.appendChild(div);
-    });
-
-    log('bt-log', `${devices.length} dispositivo(s) encontrado(s)`, 'ok');
-  } else {
-    log('bt-log', 'Erro no scan: ' + (data.err || 'sem resultado'), 'err');
+  // BUG CORRIGIDO: API agora retorna data.devices (array), não data.scan (string)
+  if (!data.ok) {
+    list.innerHTML = `<div style="color:var(--error);font-size:0.8rem;padding:10px">${data.err || 'Falha no scan'}</div>`;
+    log('bt-log', 'Erro: ' + (data.err || 'sem resultado'), 'err');
+    if (data.tip) log('bt-log', '💡 ' + data.tip, 'warn');
+    return;
   }
+
+  const devices = data.devices || [];
+
+  if (devices.length === 0) {
+    list.innerHTML = '<div style="color:var(--muted);font-size:0.8rem;padding:10px">Nenhum dispositivo encontrado. Coloque o alvo em modo visível (discoverable) e tente novamente.</div>';
+    log('bt-log', 'Nenhum dispositivo encontrado', 'warn');
+    if (data.tip) log('bt-log', '💡 ' + data.tip, 'info');
+    return;
+  }
+
+  devices.forEach(dev => {
+    const div = document.createElement('div');
+    div.className = 'net-item';
+    div.innerHTML = `
+      <div>
+        <div class="net-ssid">🦷 ${dev.name}</div>
+        <div class="net-meta">${dev.mac}</div>
+      </div>
+      <div style="font-size:0.75rem;color:var(--muted)">SELECIONAR</div>
+    `;
+    div.onclick = () => {
+      document.querySelectorAll('#bt-list .net-item').forEach(n => n.classList.remove('selected'));
+      div.classList.add('selected');
+      document.getElementById('bt-mac').value = dev.mac;
+      toast('📋 ' + dev.mac);
+    };
+    list.appendChild(div);
+  });
+
+  log('bt-log', `${devices.length} dispositivo(s) encontrado(s)`, 'ok');
+  if (data.tip) log('bt-log', '💡 ' + data.tip, 'info');
 }
 
 async function btDeauth() {

