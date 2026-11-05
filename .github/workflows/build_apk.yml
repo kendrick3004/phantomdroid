@@ -44,9 +44,29 @@ jobs:
             pkg-config \
             python3-dev \
             unzip \
+            wget \
             zip \
             zlib1g-dev
-          java -version
+
+      - name: Pre-stage Apache ANT for Buildozer
+        run: |
+          # Buildozer espera ANT em ~/.buildozer/android/platform/apache-ant-1.9.4/
+          ANT_DIR="$HOME/.buildozer/android/platform"
+          mkdir -p "$ANT_DIR"
+          if [ ! -d "$ANT_DIR/apache-ant-1.9.4" ]; then
+            echo "Baixando Apache ANT 1.9.4..."
+            wget -q --retry-connrefused --tries=5 --waitretry=3 \
+              -O /tmp/ant.tar.gz \
+              "https://dlcdn.apache.org/ant/binaries/apache-ant-1.9.4-bin.tar.gz" \
+              || wget -q --tries=3 \
+              -O /tmp/ant.tar.gz \
+              "https://downloads.apache.org/ant/binaries/apache-ant-1.9.4-bin.tar.gz"
+            tar xzf /tmp/ant.tar.gz -C "$ANT_DIR"
+            echo "ANT instalado em: $ANT_DIR/apache-ant-1.9.4"
+            ls "$ANT_DIR/apache-ant-1.9.4/bin/"
+          else
+            echo "ANT já em cache."
+          fi
 
       - name: Install Buildozer + Cython
         run: |
@@ -54,6 +74,8 @@ jobs:
           pip install buildozer cython
 
       - name: Build APK
+        env:
+          JAVA_HOME: /usr/lib/jvm/java-17-openjdk-amd64
         run: buildozer -v android debug
 
       - name: Upload APK
