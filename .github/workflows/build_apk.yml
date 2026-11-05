@@ -44,29 +44,20 @@ jobs:
             pkg-config \
             python3-dev \
             unzip \
-            wget \
             zip \
             zlib1g-dev
+          java -version
+          ant -version
 
-      - name: Pre-stage Apache ANT for Buildozer
+      - name: Fake ANT dir so Buildozer nao baixe
         run: |
-          # Buildozer espera ANT em ~/.buildozer/android/platform/apache-ant-1.9.4/
-          ANT_DIR="$HOME/.buildozer/android/platform"
-          mkdir -p "$ANT_DIR"
-          if [ ! -d "$ANT_DIR/apache-ant-1.9.4" ]; then
-            echo "Baixando Apache ANT 1.9.4..."
-            wget -q --retry-connrefused --tries=5 --waitretry=3 \
-              -O /tmp/ant.tar.gz \
-              "https://dlcdn.apache.org/ant/binaries/apache-ant-1.9.4-bin.tar.gz" \
-              || wget -q --tries=3 \
-              -O /tmp/ant.tar.gz \
-              "https://downloads.apache.org/ant/binaries/apache-ant-1.9.4-bin.tar.gz"
-            tar xzf /tmp/ant.tar.gz -C "$ANT_DIR"
-            echo "ANT instalado em: $ANT_DIR/apache-ant-1.9.4"
-            ls "$ANT_DIR/apache-ant-1.9.4/bin/"
-          else
-            echo "ANT já em cache."
-          fi
+          # Buildozer verifica se ~/.buildozer/android/platform/apache-ant-1.9.4/ existe.
+          # Se existir, pula o download. Criamos o diretório e apontamos o binário para o ant do apt.
+          ANT_FAKE="$HOME/.buildozer/android/platform/apache-ant-1.9.4"
+          mkdir -p "$ANT_FAKE/bin"
+          ln -sf "$(which ant)" "$ANT_FAKE/bin/ant"
+          echo "ANT fake criado em: $ANT_FAKE"
+          ls -la "$ANT_FAKE/bin/"
 
       - name: Install Buildozer + Cython
         run: |
