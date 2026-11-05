@@ -14,17 +14,51 @@ jobs:
       - name: Checkout
         uses: actions/checkout@v4
 
-      # Action oficial do Kivy — já tem Android SDK, NDK, ANT, tudo pronto
-      - name: Build APK com Kivy Buildozer Action
-        uses: ArtemSBulgakov/buildozer-action@v1
-        id: buildozer
+      - name: Setup Python 3.11
+        uses: actions/setup-python@v5
         with:
-          command: buildozer android debug
-          buildozer_version: stable
+          python-version: '3.11'
+
+      - name: Cache Buildozer
+        uses: actions/cache@v4
+        with:
+          path: |
+            ~/.buildozer
+            .buildozer
+          key: buildozer-${{ runner.os }}-${{ hashFiles('buildozer.spec') }}
+          restore-keys: buildozer-${{ runner.os }}-
+
+      - name: Install system dependencies
+        run: |
+          sudo apt-get update -qq
+          sudo apt-get install -y --no-install-recommends \
+            ant \
+            build-essential \
+            ccache \
+            cmake \
+            git \
+            libffi-dev \
+            libssl-dev \
+            libtool \
+            openjdk-17-jdk \
+            pkg-config \
+            python3-dev \
+            unzip \
+            zip \
+            zlib1g-dev
+          java -version
+
+      - name: Install Buildozer + Cython
+        run: |
+          pip install --upgrade pip
+          pip install buildozer cython
+
+      - name: Build APK
+        run: buildozer -v android debug
 
       - name: Upload APK
         uses: actions/upload-artifact@v4
         with:
           name: PhantomDroid-APK
-          path: ${{ steps.buildozer.outputs.filename }}
+          path: bin/*.apk
           retention-days: 30
