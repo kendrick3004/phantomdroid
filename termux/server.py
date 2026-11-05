@@ -120,40 +120,101 @@ def ir_check():
 #  WIFI SCANNER / EVIL TWIN
 # ─────────────────────────────────────────────
 
-@app.route("/api/wifi/scan")
-def wifi_scan():
-    # BUG CORRIGIDO: não checa result["ok"] porque termux-wifi-scaninfo
-    # pode retornar código 1 mas ainda assim ter saída JSON válida.
-    result = run_cmd("termux-wifi-scaninfo", timeout=25)
-    out = result["out"]
-
-    # Às vezes a saída vem no stderr
+def _wifi_scan_termux_api():
+    """Tenta via termux-wifi-scaninfo (requer Termux:API do F-Droid)."""
+    result = run_cmd("termux-wifi-scaninfo", timeout=20)
+    out = result["out"] or result["err"]
     if not out:
-        out = result["err"]
-
-    if not out:
-        return jsonify({
-            "ok": False,
-            "err": "Sem resposta do termux-wifi-scaninfo",
-            "tip": "Verifique: 1) App Termux:API instalado  2) Permissão de Localização concedida ao Termux nas Configurações do Android  3) WiFi ligado"
-        })
-
-    # Tenta parsear JSON
+        return None, "Sem resposta do termux-wifi-scaninfo"
+    # Detecta erro da Play Store (versão quebrada)
+    if "not yet available" in out or "not available" in out.lower():
+        return None, "PLAY_STORE_BROKEN"
     try:
         networks = json.loads(out)
         if isinstance(networks, list):
-            return jsonify({"ok": True, "networks": networks})
-        # Pode ser dict com campo de erro
+            return networks, None
         if isinstance(networks, dict) and "error" in networks:
-            return jsonify({"ok": False, "err": networks["error"], "tip": "Verifique permissão de Localização no Android"})
-        return jsonify({"ok": True, "networks": [networks]})
+            return None, networks["error"]
+        return [networks], None
     except json.JSONDecodeError:
-        # Saída não é JSON — pode ser mensagem de erro do termux-api
+        return None, out[:300]
+
+
+def _wifi_scan_wpa_cli():
+    """
+    Fallback: usa wpa_cli (disponível em Termux sem Termux:API).
+    Formato de saída do scan_results:
+      bssid / frequency / signal level / flags / ssid
+      00:11:22:33:44:55\t2437\t-65\t[WPA2-PSK]\tMinhaRede
+    """
+    # Dispara o scan
+    run_cmd("wpa_cli -i wlan0 scan", timeout=5)
+    time.sleep(3)  # aguarda varredura
+    result = run_cmd("wpa_cli -i wlan0 scan_results", timeout=10)
+    out = result["out"]
+
+    if not out or "FAIL" in out or "Unknown command" in out:
+        return None, "wpa_cli não disponível ou sem permissão"
+
+    networks = []
+    lines = out.strip().split("\n")
+    # Pula cabeçalho "bssid / frequency / ..."
+    for line in lines[1:]:
+        parts = line.split("\t")
+        if len(parts) >= 5:
+            bssid = parts[0].strip()
+            freq = parts[1].strip()
+            level = parts[2].strip()
+            flags = parts[3].strip()
+            ssid = parts[4].strip() or "(oculta)"
+            try:
+                level_int = int(level)
+            except ValueError:
+                level_int = -80
+            security = "WPA" if "WPA" in flags else ("WEP" if "WEP" in flags else "Open")
+            networks.append({
+                "ssid": ssid,
+                "bssid": bssid,
+                "rssi": level_int,
+                "frequency": freq,
+                "capabilities": flags,
+                "security": security,
+            })
+    if not networks:
+        return None, "Nenhuma rede encontrada pelo wpa_cli"
+    return networks, None
+
+
+@app.route("/api/wifi/scan")
+def wifi_scan():
+    # 1. Tenta Termux:API
+    networks, err = _wifi_scan_termux_api()
+    if networks is not None:
+        return jsonify({"ok": True, "networks": networks, "source": "termux-api"})
+
+    # 2. Se Termux:API da Play Store estiver quebrada, tenta wpa_cli
+    if err == "PLAY_STORE_BROKEN":
+        networks2, err2 = _wifi_scan_wpa_cli()
+        if networks2:
+            return jsonify({"ok": True, "networks": networks2, "source": "wpa_cli"})
         return jsonify({
             "ok": False,
-            "err": out[:200],
-            "tip": "Instale o app 'Termux:API' da Play Store e conceda permissão de Localização ao Termux"
+            "err": "Termux:API da Play Store está quebrada e wpa_cli também falhou",
+            "tip": "SOLUÇÃO: instale o Termux E o Termux:API pelo F-Droid (não Play Store). Link: https://f-droid.org/packages/com.termux.api/",
+            "fdroid": True
         })
+
+    # 3. Erro genérico — tenta wpa_cli como fallback
+    networks2, err2 = _wifi_scan_wpa_cli()
+    if networks2:
+        return jsonify({"ok": True, "networks": networks2, "source": "wpa_cli"})
+
+    return jsonify({
+        "ok": False,
+        "err": err or "Falha no scan WiFi",
+        "tip": "SOLUÇÃO: instale o Termux:API pelo F-Droid: https://f-droid.org/packages/com.termux.api/  —  E conceda permissão de Localização ao Termux no Android",
+        "fdroid": True
+    })
 
 @app.route("/api/wifi/info")
 def wifi_info():

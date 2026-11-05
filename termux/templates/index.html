@@ -635,9 +635,19 @@ async function wifiScan() {
   if (!data.ok) {
     log('wifi-log', 'Erro: ' + data.err, 'err');
     if (data.tip) log('wifi-log', '💡 ' + data.tip, 'warn');
+    if (data.fdroid) {
+      const box = document.getElementById('wifi-log');
+      const link = document.createElement('a');
+      link.href = 'https://f-droid.org/packages/com.termux.api/';
+      link.target = '_blank';
+      link.style.cssText = 'color:var(--accent2);display:block;padding:4px 0;font-size:0.8rem';
+      link.textContent = '→ Baixar Termux:API pelo F-Droid (clique aqui)';
+      box.appendChild(link);
+    }
     toast('❌ ' + data.err, 'error');
     return;
   }
+  if (data.source) log('wifi-log', 'Fonte: ' + data.source, 'info');
   const networks = data.networks;
   log('wifi-log', `${networks.length} redes encontradas`, 'ok');
   networks.sort((a, b) => (b.rssi || b.level || 0) - (a.rssi || a.level || 0));
